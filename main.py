@@ -1,37 +1,33 @@
-from langchain.chat_models import ChatOpenAI
-from langchain import LLMChain
-from langchain.prompts import MessagesPlaceholder, HumanMessagePromptTemplate, ChatPromptTemplate
-from langchain.memory import ConversationSummaryMemory, FileChatMessageHistory
+from langchain.document_loaders import TextLoader
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.vectorstores.chroma import Chroma
 from dotenv import load_dotenv
 
 load_dotenv()
 
-chat = ChatOpenAI(verbose=True)
-memory = ConversationSummaryMemory(
-    # chat_memory=FileChatMessageHistory("messages.json"),
-    memory_key="messages", 
-    return_messages=True,
-    llm=chat
-    )
+embeddings = OpenAIEmbeddings()
 
-prompt = ChatPromptTemplate(
-    input_variables=["content", "messages"],
-    messages=[
-        MessagesPlaceholder(variable_name="messages"),
-        HumanMessagePromptTemplate.from_template("{content}")
-    ]
+text_splitter = CharacterTextSplitter(
+    separator="\n",
+    chunk_size=200,
+    chunk_overlap=0
 )
 
-chain = LLMChain(
-    llm=chat,
-    prompt=prompt,
-    memory=memory,
-    verbose=True
+loader = TextLoader("facts.txt")
+docs = loader.load_and_split(
+    text_splitter=text_splitter
 )
 
-while True:
-    content = input(">> ")
+db = Chroma.from_documents(
+    docs,
+    embedding=embeddings,
+    persist_directory="emb"
+)
 
-    result = chain({"content": content})
+results = db.similarity_search("What is an intersting fact about english language?")
 
-    print(result["text"])
+for result in results:
+    print("\n")
+    print(result.page_content)
+
